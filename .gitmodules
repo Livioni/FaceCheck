@@ -1,0 +1,3 @@
+[submodule "smirk"]
+	path = smirk
+	url = https://github.com/georgeretsi/smirk
