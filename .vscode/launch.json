@@ -1,0 +1,48 @@
+{
+    // 使用 IntelliSense 了解相关属性。 
+    // 悬停以查看现有属性的描述。
+    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "smirk demo",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "smirk/demo.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--input_path",
+                "smirk/samples/test_image2.png",
+                "--out_path",
+                "demo_output",
+                "--checkpoint",
+                "smirk/pretrained_models/SMIRK_em1.pt",
+                "--crop"
+            ]
+        },
+        {
+            "name": "Infer",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "infer_pipeline.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--input",
+                "asset/lxq.jpg",
+                "--out_dir",
+                "demo_output/lxq",
+                "--smirk_ckpt",
+                "smirk/pretrained_models/SMIRK_em1.pt",
+                "--facecheck_ckpt",
+                "outputs/facecheck/best.pt"
+            ]
+        },
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        }
+    ]
+}

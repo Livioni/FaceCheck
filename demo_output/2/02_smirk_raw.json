@@ -1,0 +1,17 @@
+{
+  "smirk_outputs_keys": [
+    "cam",
+    "expression_params",
+    "eyelid_params",
+    "jaw_params",
+    "pose_params",
+    "shape_params"
+  ],
+  "flame": {
+    "vertices_shape": [
+      1,
+      5023,
+      3
+    ]
+  }
+}

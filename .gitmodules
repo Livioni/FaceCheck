@@ -1,3 +1,6 @@
 [submodule "smirk"]
 	path = smirk
 	url = https://github.com/georgeretsi/smirk
+[submodule "dynaface"]
+	path = dynaface
+	url = https://github.com/jeffheaton/dynaface.git
