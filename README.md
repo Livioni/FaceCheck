@@ -186,8 +186,10 @@ python infer_pipeline.py \
 通过环境变量指定 checkpoint 路径后启动服务：
 
 ```bash
-export FACECHECK_CKPT=/abs/path/to/outputs/facecheck/best.pt
-uvicorn facecheck.api.app:app --host 0.0.0.0 --port 8000
+conda activate fcheck
+export FACECHECK_CKPT="$(pwd)/outputs/facecheck/best.pt"
+export SMIRK_CKPT="$(pwd)/smirk/pretrained_models/SMIRK_em1.pt"
+python -m uvicorn facecheck.api.app:app --host 0.0.0.0 --port 8000
 ```
 
 端点：

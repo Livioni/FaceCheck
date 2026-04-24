@@ -28,9 +28,9 @@
             "console": "integratedTerminal",
             "args": [
                 "--input",
-                "asset/lxq.jpg",
+                "smirk/samples/test_image1.png",
                 "--out_dir",
-                "demo_output/lxq",
+                "demo_output/1",
                 "--smirk_ckpt",
                 "smirk/pretrained_models/SMIRK_em1.pt",
                 "--facecheck_ckpt",

@@ -296,7 +296,8 @@ def _depth_to_vis(depth: np.ndarray, mask: Optional[np.ndarray] = None) -> np.nd
 def dynaface_landmarks_and_overlay(img_bgr: np.ndarray, device: Optional[str] = None) -> Dict[str, Any]:
     facial, measures, models = _import_dynaface()
     dev = models.detect_device() if device is None else device
-    model_path = models.download_models()
+    model_dir_env = os.environ.get("DYNAFACE_MODEL_DIR", "").strip()
+    model_path = models.download_models(model_dir_env or None)
     models.init_models(model_path, dev)
 
     analyzer = facial.AnalyzeFace(measures=[measures.AnalyzeLandmarks()])
@@ -385,29 +386,32 @@ def _print_stage_done(outputs: Tuple[str, ...]) -> None:
     _print_sep()
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input", required=True, type=str)
-    parser.add_argument("--out_dir", default="output_infer", type=str)
-    parser.add_argument("--smirk_ckpt", required=True, type=str)
-    parser.add_argument("--facecheck_ckpt", required=True, type=str)
-    parser.add_argument("--device", default="cuda", type=str)
-    args = parser.parse_args()
+def run_pipeline(
+    *,
+    img_bgr: np.ndarray,
+    out_dir: str,
+    smirk_ckpt: str,
+    facecheck_ckpt: str,
+    device: str = "cuda",
+    verbose: bool = True,
+) -> Tuple[str, ...]:
+    out_dir = _ensure_dir(os.path.abspath(out_dir))
+    outputs: list[str] = []
 
-    out_dir = _ensure_dir(os.path.abspath(args.out_dir))
-    _print_stage("Stage 0 | 初始化")
-    _print_stage_done((out_dir,))
+    if verbose:
+        _print_stage("Stage 0 | 初始化")
+        _print_stage_done((out_dir,))
 
-    _print_stage("Stage 1 | 读取输入并保存原图")
-    img_bgr = cv2.imread(args.input, cv2.IMREAD_COLOR)
-    if img_bgr is None:
-        raise FileNotFoundError(args.input)
-
+    if verbose:
+        _print_stage("Stage 1 | 读取输入并保存原图")
     p_input_png = os.path.join(out_dir, "00_input.png")
     cv2.imwrite(p_input_png, img_bgr)
-    _print_stage_done((p_input_png,))
+    outputs.append(p_input_png)
+    if verbose:
+        _print_stage_done((p_input_png,))
 
-    _print_stage("Stage 2 | Crop（对齐 smirk demo）")
+    if verbose:
+        _print_stage("Stage 2 | Crop（对齐 smirk demo）")
     crop_res = crop_like_smirk_demo(img_bgr, image_size=224, scale=1.4)
     p_cropped_png = os.path.join(out_dir, "01_cropped_224.png")
     cv2.imwrite(p_cropped_png, crop_res.cropped_bgr_224)
@@ -420,10 +424,13 @@ def main() -> None:
             "cropped_mediapipe_xy": crop_res.cropped_mediapipe_xy,
         },
     )
-    _print_stage_done((p_cropped_png, p_crop_json))
+    outputs.extend([p_cropped_png, p_crop_json])
+    if verbose:
+        _print_stage_done((p_cropped_png, p_crop_json))
 
-    _print_stage("Stage 3 | SMIRK 推理深度（depth / mask / 可视化）")
-    smirk_res = smirk_depth_from_cropped_bgr_224(crop_res.cropped_bgr_224, args.smirk_ckpt, args.device)
+    if verbose:
+        _print_stage("Stage 3 | SMIRK 推理深度（depth / mask / 可视化）")
+    smirk_res = smirk_depth_from_cropped_bgr_224(crop_res.cropped_bgr_224, smirk_ckpt, device)
     depth = smirk_res["depth"]
     mask = smirk_res["mask"]
     p_depth_npy = os.path.join(out_dir, "02_depth.npy")
@@ -443,36 +450,46 @@ def main() -> None:
     )
     p_smirk_vertices_npy = os.path.join(out_dir, "02_smirk_vertices.npy")
     np.save(p_smirk_vertices_npy, smirk_res["flame"]["vertices"])
-    _print_stage_done((p_depth_npy, p_mask_npy, p_depth_vis_png, p_smirk_raw_json, p_smirk_vertices_npy))
+    outputs.extend([p_depth_npy, p_mask_npy, p_depth_vis_png, p_smirk_raw_json, p_smirk_vertices_npy])
+    if verbose:
+        _print_stage_done((p_depth_npy, p_mask_npy, p_depth_vis_png, p_smirk_raw_json, p_smirk_vertices_npy))
 
-    _print_stage("Stage 4 | DynaFace 推理关键点（landmarks / overlay）")
+    if verbose:
+        _print_stage("Stage 4 | DynaFace 推理关键点（landmarks / overlay）")
     dyna_res = dynaface_landmarks_and_overlay(crop_res.cropped_bgr_224, device=None)
     p_dynaface_landmarks_json = os.path.join(out_dir, "03_dynaface_landmarks.json")
     _write_json(
         p_dynaface_landmarks_json,
         {"ok": dyna_res["ok"], "landmarks_xy": dyna_res["landmarks_xy"]},
     )
+    outputs.append(p_dynaface_landmarks_json)
     stage4_outputs = [p_dynaface_landmarks_json]
     if dyna_res["overlay_bgr"] is not None:
         p_dynaface_overlay_png = os.path.join(out_dir, "03_dynaface_overlay.png")
         cv2.imwrite(p_dynaface_overlay_png, dyna_res["overlay_bgr"])
+        outputs.append(p_dynaface_overlay_png)
         stage4_outputs.append(p_dynaface_overlay_png)
-    _print_stage_done(tuple(stage4_outputs))
+    if verbose:
+        _print_stage_done(tuple(stage4_outputs))
 
-    _print_stage("Stage 5 | FaceCheck 推理（分类结果）")
+    if verbose:
+        _print_stage("Stage 5 | FaceCheck 推理（分类结果）")
     from facecheck.inference.predictor import FaceCheckPredictor
 
-    facecheck_ckpt_abs = _resolve_facecheck_ckpt(args.facecheck_ckpt, (os.getcwd(), _repo_root()))
-    predictor = FaceCheckPredictor.load(facecheck_ckpt_abs, device=args.device)
+    facecheck_ckpt_abs = _resolve_facecheck_ckpt(facecheck_ckpt, (os.getcwd(), _repo_root()))
+    predictor = FaceCheckPredictor.load(facecheck_ckpt_abs, device=device)
     lm_vec = _landmark_vec_for_facecheck(predictor, crop_res.cropped_bgr_224, dyna_res["landmarks_xy"])
     result = predictor.predict_bgr_depth(crop_res.cropped_bgr_224, depth, landmark_vec=lm_vec)
     p_facecheck_result_json = os.path.join(out_dir, "04_facecheck_result.json")
     p_landmark_vec_npy = os.path.join(out_dir, "04_landmark_vec.npy")
     _write_json(p_facecheck_result_json, {"prob_affected": result.prob_affected, "label": result.label})
     np.save(p_landmark_vec_npy, lm_vec.astype(np.float32))
-    _print_stage_done((p_facecheck_result_json, p_landmark_vec_npy))
+    outputs.extend([p_facecheck_result_json, p_landmark_vec_npy])
+    if verbose:
+        _print_stage_done((p_facecheck_result_json, p_landmark_vec_npy))
 
-    _print_stage("Stage 6 | 导出汇总图（final.png）")
+    if verbose:
+        _print_stage("Stage 6 | 导出汇总图（final.png）")
     overlay = dyna_res["overlay_bgr"]
     if overlay is None:
         overlay = crop_res.cropped_bgr_224.copy()
@@ -485,7 +502,34 @@ def main() -> None:
     final = _hstack((img_bgr, crop_res.cropped_bgr_224, depth_vis, overlay), height=512)
     p_final_png = os.path.join(out_dir, "final.png")
     cv2.imwrite(p_final_png, final)
-    _print_stage_done((p_final_png,))
+    outputs.append(p_final_png)
+    if verbose:
+        _print_stage_done((p_final_png,))
+
+    return tuple(outputs)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", required=True, type=str)
+    parser.add_argument("--out_dir", default="output_infer", type=str)
+    parser.add_argument("--smirk_ckpt", required=True, type=str)
+    parser.add_argument("--facecheck_ckpt", required=True, type=str)
+    parser.add_argument("--device", default="cuda", type=str)
+    args = parser.parse_args()
+
+    out_dir = _ensure_dir(os.path.abspath(args.out_dir))
+    img_bgr = cv2.imread(args.input, cv2.IMREAD_COLOR)
+    if img_bgr is None:
+        raise FileNotFoundError(args.input)
+    run_pipeline(
+        img_bgr=img_bgr,
+        out_dir=out_dir,
+        smirk_ckpt=args.smirk_ckpt,
+        facecheck_ckpt=args.facecheck_ckpt,
+        device=args.device,
+        verbose=True,
+    )
 
 
 if __name__ == "__main__":
