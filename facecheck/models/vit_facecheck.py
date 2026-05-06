@@ -65,7 +65,14 @@ class ViTFaceCheck(nn.Module):
         )
         self.head = BinaryHead(self.embed_dim, dropout=cfg.dropout)
 
-        self._ensure_landmark_pos_embed()
+        self.uses_rope = getattr(vit, "rope", None) is not None
+        if self.uses_rope:
+            for blk in self.vit.blocks:
+                attn = getattr(blk, "attn", None)
+                if attn is not None and hasattr(attn, "num_prefix_tokens"):
+                    attn.num_prefix_tokens = int(attn.num_prefix_tokens) + 1
+        else:
+            self._ensure_landmark_pos_embed()
 
     def _ensure_landmark_pos_embed(self) -> None:
         pe = getattr(self.vit, "pos_embed", None)
@@ -89,6 +96,11 @@ class ViTFaceCheck(nn.Module):
         self.vit.pos_embed = new
 
     def forward_features(self, x: torch.Tensor, landmark: torch.Tensor) -> torch.Tensor:
+        if self.uses_rope:
+            return self._forward_features_rope(x, landmark)
+        return self._forward_features_abs(x, landmark)
+
+    def _forward_features_abs(self, x: torch.Tensor, landmark: torch.Tensor) -> torch.Tensor:
         vit = self.vit
         x = vit.patch_embed(x)
         if isinstance(x, (tuple, list)):
@@ -116,6 +128,47 @@ class ViTFaceCheck(nn.Module):
         x = vit.pos_drop(x)
         for blk in vit.blocks:
             x = blk(x)
+        x = vit.norm(x)
+        return x[:, 0]
+
+    def _forward_features_rope(self, x: torch.Tensor, landmark: torch.Tensor) -> torch.Tensor:
+        vit = self.vit
+        x = vit.patch_embed(x)
+        if isinstance(x, (tuple, list)):
+            x = x[0]
+        if x.ndim == 4:
+            B, H, W, C = x.shape
+            x = x.reshape(B, H * W, C)
+            grid = (H, W)
+        else:
+            B, N, _ = x.shape
+            side = int(round(N ** 0.5))
+            grid = (side, side)
+
+        rope = getattr(vit, "rope", None)
+        if rope is not None:
+            if getattr(vit, "dynamic_img_size", False):
+                rot_pos_embed = rope.get_embed(shape=grid)
+            else:
+                rot_pos_embed = rope.get_embed()
+        else:
+            rot_pos_embed = None
+
+        prefix = []
+        if vit.cls_token is not None:
+            prefix.append(vit.cls_token.expand(x.shape[0], -1, -1))
+        reg = getattr(vit, "reg_token", None)
+        if reg is not None:
+            prefix.append(reg.expand(x.shape[0], -1, -1))
+        prefix.append(self.landmark(landmark))
+        x = torch.cat(prefix + [x], dim=1)
+
+        x = vit.pos_drop(x)
+        norm_pre = getattr(vit, "norm_pre", None)
+        if norm_pre is not None:
+            x = norm_pre(x)
+        for blk in vit.blocks:
+            x = blk(x, rope=rot_pos_embed)
         x = vit.norm(x)
         return x[:, 0]
 

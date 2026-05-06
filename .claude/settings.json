@@ -17,7 +17,10 @@
       "Bash(/home/shengyu/miniconda3/envs/smirk/bin/python -c \"import PIL; print\\('PIL:', PIL.__version__\\)\")",
       "Bash(/home/shengyu/miniconda3/envs/fcheck/bin/python -c \"from PIL import Image; im = Image.open\\('/home/shengyu/Documents/PENG/github/FaceCheck/IMG_0266.HEIC'\\); print\\('size:', im.size\\); print\\('info keys:', list\\(im.info.keys\\(\\)\\)[:30]\\)\")",
       "Bash(/home/shengyu/miniconda3/envs/fcheck/bin/python -c ' *)",
-      "Bash(python -c \"import ast; ast.parse\\(open\\('infer_pipeline.py'\\).read\\(\\)\\); print\\('OK'\\)\")"
+      "Bash(python -c \"import ast; ast.parse\\(open\\('infer_pipeline.py'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(python -c \"import timm; print\\(timm.__version__\\); ms = timm.list_models\\('*dinov3*'\\); print\\('dinov3:', ms[:30]\\)\")",
+      "Bash(python -c \"import sys; print\\(sys.executable\\)\")",
+      "Read(//home/shengyu/.conda/**)"
     ]
   }
 }

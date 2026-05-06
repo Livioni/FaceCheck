@@ -62,7 +62,7 @@ def main() -> None:
         if "landmarks.json" in files:
             has_landmarks_json = True
             break
-    use_dynaface = (not has_landmarks_json) and bool(args.use_dynaface_landmarks)
+    use_dynaface = bool(args.use_dynaface_landmarks)
     if use_dynaface and args.num_workers != 0:
         args.num_workers = 0
 

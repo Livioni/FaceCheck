@@ -11,19 +11,41 @@ from facecheck.inference.preprocess import FaceCheckPreprocessState, FaceCheckPr
 from facecheck.models.vit_facecheck import FaceCheckViTConfig, ViTFaceCheck
 
 
-def _import_dynaface() -> Any:
-    try:
+def _import_dynaface() -> Tuple[Any, Any, Any]:
+    def _try_import() -> Tuple[Any, Any, Any]:
         import dynaface.facial as facial  # type: ignore
+        import dynaface.measures as measures  # type: ignore
+        from dynaface import models  # type: ignore
 
-        return facial
+        return facial, measures, models
+
+    try:
+        return _try_import()
     except Exception:
-        root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
         lib = os.path.join(root, "dynaface", "dynaface-lib")
         if os.path.isdir(lib) and lib not in sys.path:
             sys.path.insert(0, lib)
-        import dynaface.facial as facial  # type: ignore
+        for k in [k for k in list(sys.modules) if k == "dynaface" or k.startswith("dynaface.")]:
+            sys.modules.pop(k, None)
+        import importlib
 
-        return facial
+        importlib.invalidate_caches()
+        return _try_import()
+
+
+_DYNAFACE_INITED = False
+
+
+def _ensure_dynaface_models(models: Any, device: Optional[str] = None) -> str:
+    global _DYNAFACE_INITED
+    dev = models.detect_device() if device is None else device
+    model_dir_env = os.environ.get("DYNAFACE_MODEL_DIR", "").strip()
+    model_path = models.download_models(model_dir_env or None)
+    if not _DYNAFACE_INITED:
+        models.init_models(model_path, dev)
+        _DYNAFACE_INITED = True
+    return dev
 
 
 @dataclass(frozen=True)
@@ -68,19 +90,32 @@ class FaceCheckPredictor:
         return FaceCheckPredictor(model=model, pre=pre, device=dev)
 
     def _dynaface_landmark_vec(self, img_bgr: np.ndarray) -> np.ndarray:
-        facial = _import_dynaface()
-        lms = facial.infer_landmarks_bgr(img_bgr, crop=False)
-        if not lms:
-            return np.zeros((self.pre.landmark_dim,), dtype=np.float32)
+        dim = int(self.pre.landmark_dim)
+        try:
+            facial, measures, models = _import_dynaface()
+            _ensure_dynaface_models(models)
+            analyzer = facial.AnalyzeFace(measures=[measures.AnalyzeLandmarks()])
+            ok = analyzer.load_image(img_bgr, crop=False)
+            if not ok or analyzer.is_no_face():
+                return np.zeros((dim,), dtype=np.float32)
+            lm_dict = analyzer.analyze()
+            if lm_dict is None:
+                return np.zeros((dim,), dtype=np.float32)
+            n = int(getattr(measures.AnalyzeLandmarks, "NUM_LANDMARKS", 97))
+            xy = np.zeros((n, 2), dtype=np.float32)
+            for i in range(1, n + 1):
+                xy[i - 1, 0] = float(lm_dict.get(f"landmark-{i}-x", 0.0))
+                xy[i - 1, 1] = float(lm_dict.get(f"landmark-{i}-y", 0.0))
+        except Exception:
+            return np.zeros((dim,), dtype=np.float32)
+
         h, w = img_bgr.shape[:2]
-        arr = np.asarray(lms, dtype=np.float32)
-        arr[:, 0] = arr[:, 0] / max(float(w), 1.0)
-        arr[:, 1] = arr[:, 1] / max(float(h), 1.0)
-        flat = arr.reshape(-1)
-        if flat.size < self.pre.landmark_dim:
-            pad = np.zeros((self.pre.landmark_dim - flat.size,), dtype=np.float32)
-            flat = np.concatenate([flat, pad], axis=0)
-        return flat[: self.pre.landmark_dim]
+        xy[:, 0] = xy[:, 0] / max(float(w), 1.0)
+        xy[:, 1] = xy[:, 1] / max(float(h), 1.0)
+        flat = xy.reshape(-1)
+        if flat.size < dim:
+            flat = np.concatenate([flat, np.zeros((dim - flat.size,), dtype=np.float32)], axis=0)
+        return flat[:dim].astype(np.float32, copy=False)
 
     @torch.no_grad()
     def predict_bgr_depth(

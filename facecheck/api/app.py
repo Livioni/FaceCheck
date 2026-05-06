@@ -15,6 +15,9 @@ def create_app():
         ckpt_candidates.append(os.path.expandvars(os.path.expanduser(ckpt_env)))
         if not os.path.isabs(ckpt_candidates[0]):
             ckpt_candidates.append(os.path.join(project_root, ckpt_candidates[0]))
+    # Search latest first, then older versions, then the legacy default.
+    ckpt_candidates.append(os.path.join(project_root, "outputs", "facecheck_version2", "best.pt"))
+    ckpt_candidates.append(os.path.join(project_root, "outputs", "facecheck_version1", "best.pt"))
     ckpt_candidates.append(os.path.join(project_root, "outputs", "facecheck", "best.pt"))
 
     ckpt = next((p for p in ckpt_candidates if os.path.exists(p)), "")
