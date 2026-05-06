@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import ast; ast.parse\\(open\\('facecheck/api/app.py'\\).read\\(\\)\\); ast.parse\\(open\\('facecheck/api/routes.py'\\).read\\(\\)\\); print\\('ok'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('test_quicktest.py'\\).read\\(\\)\\); ast.parse\\(open\\('facecheck/api/routes.py'\\).read\\(\\)\\); print\\('ok'\\)\")",
+      "Bash(python3 -c \"import pillow_heif; print\\('pillow_heif:', pillow_heif.__version__\\)\")",
+      "Bash(python3 -c \"import pyheif; print\\('pyheif ok'\\)\")",
+      "Bash(python3 -c \"import PIL; print\\('PIL:', PIL.__version__\\)\")",
+      "Bash(python3 -c \"import exifread; print\\('exifread ok'\\)\")",
+      "Bash(conda env *)",
+      "Read(//home/shengyu/anaconda3/**)",
+      "Read(//home/shengyu/miniconda3/envs/**)",
+      "Bash(/home/shengyu/miniconda3/envs/fcheck/bin/python -c \"import pillow_heif; print\\('pillow_heif:', pillow_heif.__version__\\)\")",
+      "Bash(/home/shengyu/miniconda3/envs/fcheck/bin/python -c \"import PIL; print\\('PIL:', PIL.__version__\\)\")",
+      "Bash(/home/shengyu/miniconda3/envs/fcheck/bin/python -c \"import cv2; print\\('cv2:', cv2.__version__\\)\")",
+      "Bash(/home/shengyu/miniconda3/envs/smirk/bin/python -c \"import pillow_heif; print\\('pillow_heif:', pillow_heif.__version__\\)\")",
+      "Bash(/home/shengyu/miniconda3/envs/smirk/bin/python -c \"import PIL; print\\('PIL:', PIL.__version__\\)\")",
+      "Bash(/home/shengyu/miniconda3/envs/fcheck/bin/python -c \"from PIL import Image; im = Image.open\\('/home/shengyu/Documents/PENG/github/FaceCheck/IMG_0266.HEIC'\\); print\\('size:', im.size\\); print\\('info keys:', list\\(im.info.keys\\(\\)\\)[:30]\\)\")",
+      "Bash(/home/shengyu/miniconda3/envs/fcheck/bin/python -c ' *)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('infer_pipeline.py'\\).read\\(\\)\\); print\\('OK'\\)\")"
+    ]
+  }
+}
